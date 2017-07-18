@@ -1,0 +1,240 @@
+#!/usr/bin/env python
+import sys, os ,dpkt, pcapy
+import struct
+import socket
+import time
+import threading
+import optparse
+
+PIDFILE="/var/r/pyscanlogger.pid"
+threshold = 60
+SCAN_TIMEOUT = 5
+#Function for getting the file  
+def findfile():
+    filename = sys.argv[1]	
+    if os.path.exists(filename): return filename
+print "        ------   -----  --------  -----------"
+print"	|    |  |     | |      |  |         |"
+print"	|  0 |  | ___ | |   0  |  |    ~    |"
+print"	|  __|  ||   || |------|  -----||----"
+print"	|  |    ||   || | | \ \	       ||"
+print"	|  |    ||___|| | |  \ \       ||"
+print"	|__|    |_____| | |   \ \      ||"
+print"			--     --      ||"
+print"	 ____     ____     ____ ______ "           
+print"	|    |   |    |   |   | |-----)"
+print"	|    |   |    |   |   | |     )"
+print"	|     \  /    |   |   | |--|)"
+print"	|      \/     |    ---  |  |"
+print"	|             |   |   | |__|"
+if len(sys.argv) <= 1:#
+     print "please keep the pcap files in the same directory of the file :"
+     print "{0}: Add your pcap file after the filename (Eg: python psd.py nullscan.pcap)".format(sys.argv[0])
+     sys.exit(-1)
+i=0
+h = []
+u = []
+
+
+
+ic = []
+FIN = dpkt.tcp.TH_FIN
+SYN = dpkt.tcp.TH_SYN  
+RST = dpkt.tcp.TH_RST  
+PSH = dpkt.tcp.TH_PUSH 
+ACK = dpkt.tcp.TH_ACK 
+URG = dpkt.tcp.TH_URG  
+ECE = dpkt.tcp.TH_ECE 
+CWR = dpkt.tcp.TH_CWR
+t = []
+x = []
+class Scan():
+    def __init__(self):
+        self.src = 0 
+        self.dst = 0 
+        self.log = False 
+        self.type = 'filenam'
+        self.tcpflags_or = 0
+        self.weight = 0 
+        self.p= 0
+        self.ports = []
+        self.next = None
+        self.hash = hash
+
+
+    def process(self,i,eth,filename,threshold,t,x,h,u,ic):
+        TCP=dpkt.tcp.TCP
+        UDP=dpkt.udp.UDP
+        ICMP=dpkt.icmp.ICMP
+        if eth.type==dpkt.ethernet.ETH_TYPE_IP: 
+	  ip=eth.data
+          if ip.p==dpkt.ip.IP_PROTO_TCP:
+		tcp=ip.data 
+                FIN = ( tcp.flags & dpkt.tcp.TH_FIN ) != 0	
+                SYN = ( tcp.flags & dpkt.tcp.TH_SYN ) != 0 
+	        RST = ( tcp.flags & dpkt.tcp.TH_RST ) != 0  
+        	PSH = ( tcp.flags & dpkt.tcp.TH_PUSH) != 0 
+        	ACK = ( tcp.flags & dpkt.tcp.TH_ACK ) != 0 
+        	URG = ( tcp.flags & dpkt.tcp.TH_URG ) != 0 
+        	ECE = ( tcp.flags & dpkt.tcp.TH_ECE ) != 0 
+        	CWR = ( tcp.flags & dpkt.tcp.TH_CWR ) != 0                
+          if type(ip.data) in (TCP, UDP, ICMP): 
+                load=(ip.data)
+                proto = type(load)
+                tcp=ip.data 
+                scan = Scan() 
+
+                if (proto == UDP):
+                    scan.src = str(socket.inet_ntoa(ip.src))
+                    scan.dst = str(socket.inet_ntoa(ip.dst))
+                    scan.sport = tcp.sport
+                    scan.dport = tcp.dport
+                    
+                    print "\nPacket%d IP Src = %s, IP Dest = %s" % (i, scan.src, scan.dst)                   
+                    scan.type = 'UDP'
+                    u.append(scan)
+                    for s in u:
+			if ((s.src ==scan.dst) and (s.dst == scan.src)):return
+                        if ((s.src == scan.src) and (s.dst == scan.dst)):
+                            s.weight +=1 
+                            if(s.log == 1): 
+                                return
+                            if (s.weight >= threshold):
+                                s.log = 1 
+                                return
+
+                if (proto == TCP):
+                    scan.src = str(socket.inet_ntoa(ip.src))
+                    scan.dst = str(socket.inet_ntoa(ip.dst))
+                    scan.sport = tcp.sport 
+                    scan.dport = tcp.dport
+                    scan.tcpflags_or |= load.flags
+                    print "\nPacket%d IP Src = %s, IP Dest = %s" % (i, scan.src, scan.dst)
+		    scan.type = self.tcpflag.get(scan.tcpflags_or,'filenam')   
+		    if (scan.type == "Null_scan"):
+                        t.append(scan) 
+                        for s in t: 
+			    if ((s.src ==scan.dst) and (s.dst == scan.src)):return 
+                            if ((s.src == scan.src) and (s.dst == scan.dst)):
+                                s.weight += 1 
+                                if(s.log == 1): 
+                                    return 
+                                if (s.weight >= threshold): 
+                                    s.log = 1 
+                                    return 
+                    elif (scan.type == "Half_Open"):
+                        h.append(scan)
+                        for s in h: 
+			    if ((s.src ==scan.dst) and (s.dst == scan.src)):return
+                            if ((s.src == scan.src) and (s.dst == scan.dst)): 
+                                
+				s.weight += 1 
+                            	if(s.log == 1): 
+                                    return
+                            	if (s.weight >= threshold): 
+                                    s.log = 1 
+                                    return
+                    elif (scan.type == "xmas"):
+                        x.append(scan) 
+                        for s in x: 
+			    if ((s.src ==scan.dst) and (s.dst == scan.src)):return
+                            if ((s.src == scan.src) and (s.dst == scan.dst)):
+
+                                s.weight += 1
+                                if(s.log == 1):
+                                    return
+                                if (s.weight >= threshold): 
+                                    s.log = 1
+                                    return
+   
+                 
+                
+                if (proto == ICMP): 
+                    scan.src = str(socket.inet_ntoa(ip.src))
+                    scan.dst = str(socket.inet_ntoa(ip.dst))
+                    #scan.flags = 0
+                    print "\nPacket%d ICMP Echo ATTCK detected! IP Src = %s, IP Dest = %s" % (i, scan.src, scan.dst)                
+                    scan.type = 'ICMP'
+                    ic.append(scan) 
+                    for s in ic:
+                        if ((s.src == scan.src) and (s.dst == scan.dst)):
+                            s.weight +=1
+                            if(s.log == 1):
+                                return
+                            s.log = 1
+                            return
+    print "------------------------------------SUMMARY------------------------------------"
+    def r (self,threshold,t,x,h,u,ic): 
+        i=1 
+        filename = 'filenam'
+        filename = findfile()       
+	f=open(filename, 'r')
+	pcap=dpkt.pcap.Reader(f)
+        for ts, pkt in dpkt.pcap.Reader(open(filename,'r')):
+	
+            eth = dpkt.ethernet.Ethernet(pkt)
+            self.process(i,eth,filename,threshold,t,x,h,u,ic)
+	    i=i+1
+        tcount = 0 
+        xcount = 0 
+        hcount = 0 
+        udp_c = 0 
+        icmp_c = 0 
+        for s in t:
+            
+            if (s.log == 1):
+                tcount += 1
+        for s in x: 
+            
+            if (s.log == 1):
+                xcount += 1 
+        for s in h:
+            if (s.log == 1):
+                hcount += 1 
+        for s in u:
+            if ((s.p== 0) and (s.log == 1)):
+                udp_c += 1 
+        for s in ic:
+            if (s.log == 1):
+                icmp_c += 1 
+        if(tcount):
+            print "\nNumber of Null_scan Scans: %d\n" % (tcount)
+            for s in t:
+                if ((s.p== 0) and (s.log == 1)):
+                    print "\nATTACK: %s Detected! Source IP: %s Dst IP: %s and %d ports have been scanned." %(s.type,s.src,s.dst,s.weight)             
+        else:
+            print "\nNULL SCAN NOT DETECTED" 
+        if(xcount):
+            print "\n\nNumber of xmas Scans: %d\n" % (xcount)
+            for s in x:
+                if ((s.p== 0) and (s.log == 1)):
+                    print "\nATTACK: %s Detected! Source IP: %s Dst IP: %s and %d ports have been scanned." %(s.type,s.src,s.dst,s.weight)
+        else:
+            print "\n XMAS SCAN NOT DETECTED"
+        if(udp_c):
+            print "\nNumber of UDP Scans: %d\n" % (udp_c)          
+            for s in u:
+                if ((s.p== 0) and (s.log == 1)):
+                    print "\nATTACK: %s Detected! Source IP: %s Dst IP: %sand  %d ports have been scanned." %(s.type,s.src,s.dst,s.weight)
+        else:
+            print "\nUDP SCAN IS NOT DETECTED"
+        if(icmp_c):
+            print "\nNumber of ICMP Echo Scans: %d\n" % (icmp_c)       
+            for s in ic:
+                if ((s.p== 0) and (s.log == 1)):
+                    print "\nATTACK: %s Detected! Source IP: %s Dst IP: %s and %d ports have been scanned." %(s.type,s.src,s.dst,s.weight)       
+        else:
+            print "\nICMP Echo SCAN NOT DETECTED"
+        if(hcount):
+            print "\nNumber of Half_Open Scans: %d\n" % (hcount)     
+            for s in h:
+                if ((s.p== 0) and (s.log == 1)):
+                    print "\nATTACK: %s Detected! Source IP: %s Dst IP: %s and  %d ports have been scanned." %(s.type,s.src,s.dst,s.weight)        
+        else:
+            print "\nHALF OPEN SCAN NOT DETECTED "
+
+if __name__ == '__main__':
+    s=port_scanner()
+    s.r(threshold,t,x,h,u,ic)
+    print "                                         SUMMARY "
+    print "                                         submitted by xxx  "
